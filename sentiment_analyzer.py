@@ -48,7 +48,7 @@ classifier = nltk.NaiveBayesClassifier.train( training_set )
 
 #print( classifier.show_most_informative_features(32) )
 
-tweet = 'The movie is not looking'
+tweet = 'he is my enemy'
 print(classifier.classify( feature_extractor(tweet) ))
 
 #print( feature_extractor(tweet) )
