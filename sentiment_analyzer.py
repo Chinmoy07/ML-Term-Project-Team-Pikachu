@@ -1,6 +1,7 @@
 import nltk
 import csv
 from nltk.stem.porter import PorterStemmer
+import json
 
 #pos_tweets = [('I love this car', 'positive'),
 #              ('This view is amazing', 'positive'),
@@ -37,7 +38,6 @@ def feature_extractor( test_tweet ):
     tweet_words_set = set( test_tweet )
     stemmed_words = list_stemmer( tweet_words_set ) 
     features = {}
-    st = PorterStemmer()
     for word in word_features:
         features[ 'contains(%s)' % word ] =  ( word in  stemmed_words ) 
     return features
@@ -54,31 +54,35 @@ def trainer_example( ):
                 pos_tweets.append( (row[1], "positive" ) )
     return ( pos_tweets, neg_tweets )
 
+def predict( classifier, tweet ):
+    return classifier.classify( feature_extractor( tweet.split() ) )
+
 #### MAIN FUNCTION BEGINS
 
 ( pos_tweets, neg_tweets ) = trainer_example()
 tweets = []
- 
+
 for (line, sentiment) in pos_tweets + neg_tweets:
     words_filtered = [e.lower() for e in line.split() if len(e) > 2]
     stemmed_words_list = list_stemmer( words_filtered )
     tweets.append( ( stemmed_words_list, sentiment ) )
 
-#print(tweets)
-#print(get_all_words(tweets))
-
 word_features = get_word_features( get_all_words(tweets) )
-#print(word_features)
 
 training_set = nltk.classify.apply_features( feature_extractor, tweets )
 
 classifier = nltk.NaiveBayesClassifier.train( training_set )
 
-tweet = 'i won the match'
-print(classifier.classify( feature_extractor(tweet.split()) ))
+with open("tweets.json", "r") as tweets_file:
+    data = json.load( tweets_file )
 
-tweet = 'it was a loss'
-print(classifier.classify( feature_extractor(tweet.split()) ))
-
-tweet = 'it was a profit'
-print(classifier.classify( feature_extractor(tweet.split()) ))
+ts_file = open("timeseries.json", "w") 
+ts_dict = {}
+for obj in data["tweets"]:
+    pred = predict( classifier, obj["text"] )
+    print( pred )
+    try:
+        ts_dict[ obj["date"] ].append( pred )
+    except( Exception ):
+        ts_dict[ obj["date"] ] = [ pred ]
+ts_file.write( json.dumps( ts_dict ) )
