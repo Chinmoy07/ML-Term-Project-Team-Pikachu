@@ -1,7 +1,8 @@
 import csv
 import json
+import sys
 
-timeframe = 5
+timeframe = 12
 
 def minimum(a, b):
     return a < b
@@ -9,11 +10,24 @@ def minimum(a, b):
 def maximum(a, b):
     return a > b
 
+def get_sentiment_strength( sentiment_array ):
+    sum = 0.0
+    
+    for item in sentiment_array:
+        if( item == "positive" ):
+            sum += 1.0;
+    return sum / len( sentiment_array )
+
 def read_csv_calculate_feature( filename, target_reqd ):
     flag = False
     close_price = []
     volume = []
     date = []
+    
+    with open("timeseries.json", "r") as senti_file:
+        sentiments = json.load( senti_file )
+    
+    
     with open( filename, "r" ) as csv_file:
         data = csv.reader( csv_file ) 
         for row in data:
@@ -23,9 +37,13 @@ def read_csv_calculate_feature( filename, target_reqd ):
                 date.append( row[0] )
             else:
                 flag = True
-        
+    
+    flag = False    
     on_balance_volume = 0
     moving_average = 0
+    prev_moving_avg = 0
+    exp_moving_avg = 0
+    prev_exp_moving_avg = 0
     
     for i in range(1, timeframe):
         moving_average += ( close_price[ i ] / timeframe )
@@ -35,13 +53,19 @@ def read_csv_calculate_feature( filename, target_reqd ):
         
         obj = {}
         '''
-            MOVING AVERAGE CALCULATION
+            SIMPLE MOVING AVERAGE CALCULATION
         '''
         moving_average += ( close_price[ i ]/timeframe )
-        obj["Moving Average"] = moving_average
+        if(flag):
+            if( prev_moving_avg > moving_average ):
+                obj["Moving Average"] = -1
+            else:
+                obj["Moving Average"] = 1
+        #obj["Moving Average"] = moving_average
+        prev_moving_avg = moving_average
         moving_average -= ( close_price[ i-timeframe+1 ]/timeframe )
         
-        
+            
         '''
             PRICE MOMENTUM OSCILLATOR CALCULATION
         '''
@@ -79,11 +103,18 @@ def read_csv_calculate_feature( filename, target_reqd ):
         '''        
         if( close_price[i-1] > close_price[i] ):
             #on_balance_volume -= volume[i]
-            on_balance_volume = 0
+            on_balance_volume = -1
         else:
             #on_balance_volume += volume[i]
             on_balance_volume = 1
         obj["On Balance Volume"] = on_balance_volume 
+        
+        '''
+            SENTIMENT STRENGTH
+        '''
+        sentiment_strength = get_sentiment_strength( sentiments[ date[i] ] )
+        obj["Sentiment Strength"] = sentiment_strength
+        print( date[i] + "    " + str( get_sentiment_strength( sentiments[ date[i] ] ) )  )            
         
         '''
             TARGET
@@ -92,15 +123,18 @@ def read_csv_calculate_feature( filename, target_reqd ):
             if( close_price[i+1] > close_price[i] ):
                 target = 1
             else:
-                target = -1 
+                target = -1
             obj["Target"] =  target
-        features.append( obj )
+        if( flag ):
+            features.append( obj )
+        else:
+            flag = True
     return features            
             
-stock_features = read_csv_calculate_feature( "microsoft-stock.csv", True )
-index_features = read_csv_calculate_feature( "sp-index.csv", False )
+#stock_features = read_csv_calculate_feature( "microsoft-stock.csv", True )
+index_features = read_csv_calculate_feature( "sp-index.csv", True )
 features_dict = {}
-features_dict["Stock Features"] = stock_features
+#features_dict["Stock Features"] = stock_features
 features_dict["Index Features"] = index_features
 f = open("features.json", "w")
 f.write( json.dumps( features_dict ) )
